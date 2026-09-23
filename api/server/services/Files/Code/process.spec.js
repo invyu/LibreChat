@@ -2141,6 +2141,32 @@ describe('Code Process', () => {
       return { handleFileUpload, getDownloadStream };
     }
 
+    it('uploads an authorized Prowess attachment that has no prior sandbox reference', async () => {
+      const file = {
+        file_id: 'new-upload',
+        filename: 'data.csv',
+        filepath: '/uploads/data.csv',
+        source: 'local',
+      };
+      const { handleFileUpload } = setupReuploadMocks({
+        storage_session_id: 'new-session',
+        file_id: 'new-file',
+      });
+
+      const result = await primeFiles({
+        req: { user: { id: 'user-123', role: 'USER' } },
+        authorizedFiles: [file],
+        tool_resources: { execute_code: { file_ids: [file.file_id] } },
+      });
+
+      expect(handleFileUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'user', id: 'user-123', filename: 'data.csv' }),
+      );
+      expect(result.files).toEqual([
+        expect.objectContaining({ id: 'new-file', storage_session_id: 'new-session' }),
+      ]);
+    });
+
     it('uses the permission resource type established by the calling route', async () => {
       const files = [
         {

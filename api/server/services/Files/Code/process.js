@@ -1163,7 +1163,10 @@ const primeFiles = async (options) => {
     }
 
     const ref = getCodeEnvRefForProfile(file.metadata, executionProfile);
-    const sourceRef = ref ?? getCodeEnvRefs(file.metadata)[0]?.[1];
+    const sourceRef =
+      ref ??
+      getCodeEnvRefs(file.metadata)[0]?.[1] ??
+      (options.authorizedFiles && req?.user?.id ? { kind: 'user', id: req.user.id } : undefined);
     if (!sourceRef) {
       skippedNoRef += 1;
       logger.debug(`[primeCodeFiles] file=${file.file_id} path=skip reason=no-codeenvref`);
