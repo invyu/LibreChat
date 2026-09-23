@@ -1126,7 +1126,9 @@ const primeFiles = async (options) => {
 
   // Get all files first
   const allFiles =
-    (await getFiles({ file_id: { $in: Array.from(candidateFileIds) } }, null, { text: 0 })) ?? [];
+    options.authorizedFiles ??
+    (await getFiles({ file_id: { $in: Array.from(candidateFileIds) } }, null, { text: 0 })) ??
+    [];
 
   // Filter by access if user and agent are provided
   let dbFiles;

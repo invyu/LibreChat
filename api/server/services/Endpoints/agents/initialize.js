@@ -50,6 +50,7 @@ const {
   isFatalAgentInitializationError,
 } = require('~/server/services/ToolService');
 const { filterFilesByAgentAccess } = require('~/server/services/Files/permissions');
+const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const {
   getSkillToolDeps,
   getSkillDbMethods,
@@ -1330,6 +1331,29 @@ const initializeClient = async ({
         '[/api/server/services/Endpoints/agents/initialize.js] Error getting custom endpoint config',
         err,
       );
+    }
+  }
+
+  const prowessHeaders = primaryConfig.model_parameters?.configuration?.defaultHeaders;
+  if (prowessHeaders?.['X-Prowess-Code-Files'] === 'enabled') {
+    const authorizedFiles = primaryConfig.requestAttachments ?? [];
+    if (authorizedFiles.length > 10) {
+      throw new Error('Enview AI supports at most 10 sandbox input files per request');
+    }
+    const fileIds = authorizedFiles.map((file) => file.file_id).filter(Boolean);
+    if (fileIds.length > 0) {
+      const { files } = await primeCodeFiles({
+        req,
+        authorizedFiles,
+        tool_resources: { execute_code: { file_ids: fileIds } },
+        codeApiBaseUrl: primaryConfig.codeExecutionContext.baseUrl,
+        executionProfile: primaryConfig.codeExecutionContext.executionProfile,
+      });
+      prowessHeaders['X-Prowess-Code-Files'] = Buffer.from(JSON.stringify(files)).toString(
+        'base64url',
+      );
+    } else {
+      delete prowessHeaders['X-Prowess-Code-Files'];
     }
   }
 

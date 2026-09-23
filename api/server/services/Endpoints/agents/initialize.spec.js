@@ -14,6 +14,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 const mockInitializeAgent = jest.fn();
 const mockValidateAgentModel = jest.fn();
+const mockPrimeCodeFiles = jest.fn();
 
 function deferred() {
   let resolve;
@@ -56,6 +57,10 @@ jest.mock('~/server/controllers/agents/callbacks', () => ({
     capturedToolExecuteOptions = opts?.toolExecuteOptions;
     return {};
   }),
+}));
+
+jest.mock('~/server/services/Files/Code/process', () => ({
+  primeFiles: (...args) => mockPrimeCodeFiles(...args),
 }));
 
 const mockLoadToolsForExecution = jest.fn();
@@ -255,6 +260,52 @@ describe('initializeClient — processAgent ACL gate', () => {
         jobCreatedAt: 1234,
       }),
     );
+  });
+
+  it('primes authorized Prowess inputs into an opaque request header', async () => {
+    const file = { file_id: 'file-1', filename: 'data.csv' };
+    const primary = makePrimaryConfig([]);
+    primary.endpoint = 'Prowess';
+    primary.requestAttachments = [file];
+    primary.model_parameters = {
+      configuration: { defaultHeaders: { 'X-Prowess-Code-Files': 'enabled' } },
+    };
+    mockInitializeAgent.mockResolvedValue(primary);
+    mockPrimeCodeFiles.mockResolvedValue({
+      files: [
+        {
+          id: 'sandbox-1',
+          storage_session_id: 'store-1',
+          resource_id: 'user-1',
+          kind: 'user',
+          name: 'data.csv',
+        },
+      ],
+    });
+
+    await initializeClient({
+      req: makeReq(),
+      res: {},
+      signal: new AbortController().signal,
+      endpointOption: { ...makeEndpointOption(), endpoint: 'Prowess' },
+    });
+
+    expect(mockPrimeCodeFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authorizedFiles: [file],
+        tool_resources: { execute_code: { file_ids: ['file-1'] } },
+      }),
+    );
+    const encoded = primary.model_parameters.configuration.defaultHeaders['X-Prowess-Code-Files'];
+    expect(JSON.parse(Buffer.from(encoded, 'base64url').toString())).toEqual([
+      {
+        id: 'sandbox-1',
+        storage_session_id: 'store-1',
+        resource_id: 'user-1',
+        kind: 'user',
+        name: 'data.csv',
+      },
+    ]);
   });
 
   it('publishes event-root activity through the owning child task stream', async () => {
