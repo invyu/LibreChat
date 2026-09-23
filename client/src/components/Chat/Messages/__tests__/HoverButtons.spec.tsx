@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ContentTypes,
   EModelEndpoint,
+  QueryKeys,
   type TConversation,
   type TMessage,
 } from 'librechat-data-provider';
@@ -35,6 +36,7 @@ function renderHoverButtons({
   latestMessageId = 'assistant-1',
   getCanCopy = () => hasCopyableText({ text: message.text, content: message.content }),
   handleFeedback,
+  branching = true,
 }: {
   isSubmitting: boolean;
   message?: TMessage;
@@ -43,9 +45,13 @@ function renderHoverButtons({
   latestMessageId?: string;
   getCanCopy?: () => boolean;
   handleFeedback?: () => void;
+  branching?: boolean;
 }) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
+  });
+  queryClient.setQueryData([QueryKeys.startupConfig, false, 'default'], {
+    interface: { branching },
   });
 
   const initializeState = ({ set }: MutableSnapshot) => set(store.textToSpeech, false);
@@ -78,6 +84,26 @@ function renderHoverButtons({
 }
 
 describe('HoverButtons edit affordance', () => {
+  it('hides branch-changing controls when branching is disabled', () => {
+    const assistantMessage = {
+      ...userMessage,
+      messageId: 'assistant-1',
+      isCreatedByUser: false,
+      text: 'Settled response',
+    } as TMessage;
+    const container = renderHoverButtons({
+      branching: false,
+      isSubmitting: false,
+      message: assistantMessage,
+      isLast: true,
+      latestMessageId: assistantMessage.messageId,
+    });
+
+    expect(container.querySelector(`#edit-${assistantMessage.messageId}`)).toBeNull();
+    expect(screen.queryByTestId('regenerate-generation-button')).toBeNull();
+    expect(container.querySelector('[aria-label="Fork message"]')).toBeNull();
+  });
+
   it('keeps edit available on an earlier message while a generation is in flight', () => {
     const container = renderHoverButtons({ isSubmitting: true });
     const editButton = container.querySelector<HTMLButtonElement>(`#edit-${userMessage.messageId}`);

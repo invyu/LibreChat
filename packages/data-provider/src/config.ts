@@ -1536,6 +1536,7 @@ export const interfaceSchema = z
     customWelcome: z.string().optional(),
     mcpServers: mcpServersSchema.optional(),
     modelSelect: z.boolean().optional(),
+    branching: z.boolean().optional(),
     parameters: z.boolean().optional(),
     multiConvo: z.boolean().optional(),
     bookmarks: z.boolean().optional(),
@@ -1652,6 +1653,7 @@ export const interfaceSchema = z
   })
   .default({
     modelSelect: true,
+    branching: true,
     parameters: true,
     presets: true,
     multiConvo: true,
