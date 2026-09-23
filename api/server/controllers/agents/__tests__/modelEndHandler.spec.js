@@ -6,6 +6,8 @@ jest.mock('@librechat/api', () => ({
   emitEvent: jest.fn(),
   createToolExecuteHandler: jest.fn(),
   markSummarizationUsage: (usage) => usage,
+  getProwessCodeOutput: (value) =>
+    value?.prowess_files ? { toolCallId: value.id, files: value.prowess_files } : null,
 }));
 jest.mock('~/server/services/Files/Citations', () => ({
   processFileCitations: jest.fn(),
@@ -19,6 +21,7 @@ jest.mock('~/server/services/Files/process', () => ({
 }));
 
 const { ModelEndHandler, contextualizeModelUsage } = require('../callbacks');
+const { Tools } = require('librechat-data-provider');
 
 const buildGraph = () => ({
   getAgentContext: () => ({
@@ -233,5 +236,23 @@ describe('ModelEndHandler — Vertex thoughtSignature capture (issue #13006 foll
 
   it('throws when collectedUsage is not an array (existing contract)', () => {
     expect(() => new ModelEndHandler(null)).toThrow('collectedUsage must be an array');
+  });
+
+  it('forwards Prowess generated files through the existing code-output callback', async () => {
+    const toolEndCallback = jest.fn();
+    const handler = new ModelEndHandler([], null, null, toolEndCallback);
+    const files = [{ id: 'file-1', name: 'report.pdf', storage_session_id: 'store-1' }];
+
+    await handler.handle(
+      'on_chat_model_end',
+      { output: { additional_kwargs: { __raw_response: { id: 'chat-1', prowess_files: files } } } },
+      { run_id: 'message-1', thread_id: 'conversation-1' },
+      buildGraph(),
+    );
+
+    expect(toolEndCallback).toHaveBeenCalledWith(
+      { output: { name: Tools.execute_code, tool_call_id: 'chat-1', artifact: { files } } },
+      expect.objectContaining({ run_id: 'message-1', thread_id: 'conversation-1' }),
+    );
   });
 });

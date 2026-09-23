@@ -28,6 +28,7 @@ const {
   isCodeSessionToolName,
   shouldSignalSandboxStart,
   getToolInputValidationDetails,
+  getProwessCodeOutput,
 } = require('@librechat/api');
 const { processFileCitations } = require('~/server/services/Files/Citations');
 const { processCodeOutput, runPreviewFinalize } = require('~/server/services/Files/Code/process');
@@ -99,13 +100,19 @@ class ModelEndHandler {
    * @param {(data: Record<string, unknown>) => Promise<void> | void} [emitUsage] Optional
    *   callback to stream per-call token usage to the client.
    */
-  constructor(collectedUsage, collectedThoughtSignatures = null, emitUsage = null) {
+  constructor(
+    collectedUsage,
+    collectedThoughtSignatures = null,
+    emitUsage = null,
+    toolEndCallback = null,
+  ) {
     if (!Array.isArray(collectedUsage)) {
       throw new Error('collectedUsage must be an array');
     }
     this.collectedUsage = collectedUsage;
     this.collectedThoughtSignatures = collectedThoughtSignatures;
     this.emitUsage = emitUsage;
+    this.toolEndCallback = toolEndCallback;
   }
 
   finalize(errorMessage) {
@@ -132,6 +139,19 @@ class ModelEndHandler {
     let errorMessage;
     try {
       const agentContext = graph.getAgentContext(metadata);
+      const codeOutput = getProwessCodeOutput(data?.output?.additional_kwargs?.__raw_response);
+      if (codeOutput && this.toolEndCallback) {
+        await this.toolEndCallback(
+          {
+            output: {
+              name: Tools.execute_code,
+              tool_call_id: codeOutput.toolCallId,
+              artifact: { files: codeOutput.files },
+            },
+          },
+          { ...metadata, codeExecutionContext: agentContext?.codeExecutionContext },
+        );
+      }
       if (data?.output?.additional_kwargs?.stop_reason === 'refusal') {
         const info = { ...data.output.additional_kwargs };
         errorMessage = JSON.stringify({
@@ -486,6 +506,7 @@ function getDefaultHandlers({
       collectedUsage,
       collectedThoughtSignatures,
       emitTokenUsage,
+      toolEndCallback,
     ),
     [GraphEvents.TOOL_END]: new ToolEndHandler(toolEndCallback, logger),
     [GraphEvents.ON_RUN_STEP]: {
