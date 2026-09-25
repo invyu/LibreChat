@@ -1,4 +1,5 @@
 import { EModelEndpoint, isAssistantsEndpoint } from 'librechat-data-provider';
+import { useGetStartupConfig } from '~/data-provider';
 
 type TUseGenerations = {
   error?: boolean;
@@ -23,7 +24,10 @@ export default function useGenerationsByLatest({
   latestMessageId,
   isCreatedByUser = false,
 }: TUseGenerations) {
+  const { data: startupConfig } = useGetStartupConfig();
+  const branchingEnabled = startupConfig?.interface?.branching !== false;
   const isEditableEndpoint = Boolean(
+    branchingEnabled &&
     [
       EModelEndpoint.openAI,
       EModelEndpoint.custom,
@@ -45,6 +49,7 @@ export default function useGenerationsByLatest({
     isEditableEndpoint;
 
   const branchingSupported = Boolean(
+    branchingEnabled &&
     [
       EModelEndpoint.azureOpenAI,
       EModelEndpoint.openAI,
@@ -69,7 +74,7 @@ export default function useGenerationsByLatest({
     !branchingSupported ||
     (!isEditableEndpoint && !isCreatedByUser);
 
-  const forkingSupported = !isAssistantsEndpoint(endpoint) && !searchResult;
+  const forkingSupported = branchingEnabled && !isAssistantsEndpoint(endpoint) && !searchResult;
 
   return {
     forkingSupported,
