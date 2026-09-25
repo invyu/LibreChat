@@ -1,0 +1,21 @@
+name: Deploy LibreChat Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy and Restart Containers
+        run: |
+          cd /var/www/html/LibreChat
+          git fetch origin staging
+          git reset --hard origin/staging
+          docker compose -f docker-compose.yml up -d --build
