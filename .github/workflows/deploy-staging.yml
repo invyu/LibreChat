@@ -7,15 +7,36 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy and Restart Containers
+      - name: Set Build Metadata
+        id: metadata
         run: |
-          cd /var/www/html/LibreChat
-          git fetch origin staging
-          git reset --hard origin/staging
-          docker compose -f docker-compose.yml up -d --build
+          echo "VERSION=$(git rev-parse --short HEAD)-$(git log -1 --pretty=format:'%cd' --date=format:'%d%m%Y-%H%M')" >> $GITHUB_OUTPUT
+          echo "COMMITTER=$(git log -1 --pretty=format:'%an')" >> $GITHUB_OUTPUT
+          echo "COMMIT_MSG=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Server
+        run: |
+          echo "Version: ${{ steps.metadata.outputs.VERSION }}"
+          echo "Committer: ${{ steps.metadata.outputs.COMMITTER }}"
+          
+          # Ensure directory exists and copy files directly
+          mkdir -p /var/www/html/librechat
+          cp -r . /var/www/html/librechat/
+          
+          # Write version metadata file
+          cd /var/www/html/librechat
+          echo "{\"version\": \"${{ steps.metadata.outputs.VERSION }}\", \"committer\": \"${{ steps.metadata.outputs.COMMITTER }}\", \"comment\": \"${{ steps.metadata.outputs.COMMIT_MSG }}\"}" > version.json
+
+          # Restart LibreChat containers automatically if docker-compose exists
+          if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ]; then
+            docker compose down || true
+            docker compose up -d --build
+          else
+            echo "No docker-compose file found. Skipping container restart."
+          fi
