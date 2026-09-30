@@ -25,12 +25,12 @@ jobs:
           echo "Version: ${{ steps.metadata.outputs.VERSION }}"
           echo "Committer: ${{ steps.metadata.outputs.COMMITTER }}"
           
-          # Ensure directory exists and copy files directly
-          mkdir -p /var/www/html/librechat
-          cp -r . /var/www/html/librechat/
+          # Ensure directory exists and copy files directly to the new path
+          mkdir -p /var/www/html/enview-ai/src/LibreChat
+          cp -r . /var/www/html/enview-ai/src/LibreChat/
           
           # Write version metadata file
-          cd /var/www/html/librechat
+          cd /var/www/html/enview-ai/src/LibreChat
           echo "{\"version\": \"${{ steps.metadata.outputs.VERSION }}\", \"committer\": \"${{ steps.metadata.outputs.COMMITTER }}\", \"comment\": \"${{ steps.metadata.outputs.COMMIT_MSG }}\"}" > version.json
 
           # Restart LibreChat containers automatically if docker-compose exists
